@@ -1,0 +1,4 @@
+abstract_instrument_interface>=0.6
+PyQt5>=5.15.6
+pyqtgraph
+numpy

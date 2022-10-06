@@ -1,0 +1,2 @@
+include pyThorlabsAPT/graphics/*
+include pyThorlabsAPT/thorlabs_apt/*

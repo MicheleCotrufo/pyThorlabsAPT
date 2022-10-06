@@ -211,7 +211,7 @@ class interface(abstract_instrument_interface.abstract_interface):
                 return True
         except ValueError:
             self.logger.error(f"The step size must be a valid float number.")
-            self.sig_list_devices_updated.emit(self.settings['step_size'])
+            self.sig_step_size.emit(self.settings['step_size'])
             return False
         self.logger.info(f"The step size is now {step_size}.")
         self.settings['step_size'] = step_size
@@ -242,8 +242,6 @@ class interface(abstract_instrument_interface.abstract_interface):
         if self.is_device_moving():
             self.logger.error(f"Cannot start moving while device is already moving.")
             return
-        if self.instrument.is_in_motion == True:
-            raise RuntimeError('Need to wait for previous movement to end.')
         if step_size == None:
             step_size = self.settings['step_size']
         movement = direction*step_size
@@ -256,7 +254,7 @@ class interface(abstract_instrument_interface.abstract_interface):
         
     def end_movement(self,send_signal = True):
         # When send_signal = False, the method self.set_non_moving_state() is NOT called, which means the signal self.sig_change_moving_status.emit(self.SIG_MOVEMENT_ENDED) is not emitted
-        # This is useful, e.g., when doing a ramp, when at each step of the ramp we want to read the position but not sending the signal that the movement has ended, so that the GUI remains disabled
+        # This is useful, e.g., when doing a ramp, when at each step of the ramp we want to read the position but we do not want to send the signal that the movement has ended, so that the GUI remains disabled
         self.read_position()
         self.logger.info(f"Movement ended. New position = {self.output['Position']}")
         if send_signal:
@@ -316,11 +314,11 @@ class interface(abstract_instrument_interface.abstract_interface):
         self.check_property_until(lambda : self.instrument.is_in_motion,[True,False],[[self.read_position],[self.end_movement]])
 
 class gui(abstract_instrument_interface.abstract_gui):
+    """
+    Attributes specific for this class (see the abstract class abstract_instrument_interface.abstract_gui for general attributes)
+    ----------
+    """
     def __init__(self,interface,parent):
-        """
-        Attributes specific for this class (see the abstract class abstract_instrument_interface.abstract_gui for general attributes)
-        ----------
-        """
         super().__init__(interface,parent)
         self.initialize()
        

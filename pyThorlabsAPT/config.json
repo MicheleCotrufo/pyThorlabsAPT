@@ -8,12 +8,5 @@
         "ramp_wait_1": 1.0,
         "ramp_wait_2": 1.0
     },
-    "ramp_numb_steps": 5,
-    "ramp_repeat": 1,
-    "ramp_reverse": true,
-    "ramp_send_initial_trigger": true,
-    "ramp_step_size": 2.0,
-    "ramp_wait_1": 0.8,
-    "ramp_wait_2": 0.8,
     "step_size": 20.0
 }

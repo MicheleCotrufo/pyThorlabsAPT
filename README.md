@@ -1,9 +1,9 @@
 # pyThorlabsAPT
 
-```pyThorlabsAPT``` is a Python library/GUI interface to control any motor compatible with the Thorlabs APT communication protocol The package is composed of two parts, a
-low-level driver to perform basic operations, and high-level GUI, written with PyQt5, which can be easily embedded into other GUIs. The low-level driver is essentially a wrapper of the excellent
+```pyThorlabsAPT``` is a Python library/GUI interface to control any motor compatible with the Thorlabs APT communication protocol. The package is composed of two parts, a
+low-level driver to perform basic operations, and a high-level GUI, written with PyQt5, which can be easily embedded into other GUIs. The low-level driver is essentially a wrapper of the excellent
 package [thorlabs_apt](https://github.com/qpit/thorlabs_apt), with a few tweaks to speed up loading time and error handling.
-Since [thorlabs_apt](https://github.com/qpit/thorlabs_apt) is not available via ```pip```, its code has been embedded in the code of this package, [here](https://github.com/MicheleCotrufo/pyThorlabsAPT/blob/master/thorlabs_apt).
+Since [thorlabs_apt](https://github.com/qpit/thorlabs_apt) is not available via ```pip```, its code has been embedded in the code of this package, [here](https://github.com/MicheleCotrufo/pyThorlabsAPT/tree/master/pyThorlabsAPT/thorlabs_apt).
 
 ## Table of Contents
  - [Installation](#installation)
@@ -14,7 +14,7 @@ Since [thorlabs_apt](https://github.com/qpit/thorlabs_apt) is not available via 
 
 
 ## Installation
-The package uses the Thorlabs' APT.dll shared library, and it therefore only works under Windows. To install, follow these steps
+The package uses the Thorlabs APT.dll shared library, and therefore it only works under Windows. To install, follow these steps:
 
 1. Install the script via the package manager pip,
 ```bash
@@ -24,13 +24,14 @@ pip install pyThorlabsAPT
 
 3. Locate the file APT.dll which has been installed on your computer by the APT software. This file will typically be in the folder "[APT Installation Folder]\APT Server", where
 [APT Installation Folder] is the installation folder of the APT software (typically [APT Installation Folder] = C:\Program Files\Thorlabs\APT). Copy the APT.dll into one of these locations:
-*C:\Windows\System32
-*The folder of your python application
-*Inside the "[Python packages folder]\pyThorlabsAPT\thorlabs_apt". Most of the times [Python packages folder] = "[Python folder]\Lib\site-packages".
-
+	<ul>
+	      <li>C:\Windows\System32.</li>
+	      <li>The folder of your python application.</li>
+	      <li>Inside the "[Python packages folder]\pyThorlabsAPT\thorlabs_apt". Most of the times [Python packages folder] = "[Python folder]\Lib\site-packages".</li>
+	</ul>
 
 These steps are enough to run the low-level driver of ```pyThorlabsAPT```. In order to use the GUI, it is necessary to install additional libraries,
-specified in the ```requirements.txt``` files,
+specified in the ```requirements.txt``` file,
 ```bash
 pip install abstract_instrument_interface>=0.6
 pip install "PyQt5>=5.15.6"
@@ -40,10 +41,9 @@ pip install numpy
 
 ## Usage via the low-level driver
 
-`pyThorlabsAPT` can be used to control a device from the CLI or from your Python script
+`pyThorlabsAPT` can be used to control a device from the command line or from your Python script.
 
-
-### Examples
+### Example
 
 ```python
 from pyThorlabsAPT.driver import pyThorlabsAPT
@@ -57,8 +57,8 @@ instrument.move_by(10)
 instrument.is_in_motion # returns True when instrument is moving
 instrument.position = 10 # Goes to position 10
 ```
-Most of the properties and methods of the class pyThorlabsAPT are actually inherited from the [thorlabs_apt](https://github.com/qpit/thorlabs_apt) package. 
-Here below the main properties methods are summarized for quick reference.
+Most of the properties and methods of the class `pyThorlabsAPT` are actually inherited from the [thorlabs_apt](https://github.com/qpit/thorlabs_apt) package. 
+Here below the main properties and methods are summarized for quick reference.
 
 **Properties**
 

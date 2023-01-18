@@ -1,2 +1,3 @@
 include pyThorlabsAPT/graphics/*
 include pyThorlabsAPT/thorlabs_apt/*
+include pyThorlabsAPT/*.json

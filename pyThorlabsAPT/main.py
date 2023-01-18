@@ -11,7 +11,8 @@ import sys
 import argparse
 
 import abstract_instrument_interface
-from pyThorlabsAPT.driver import pyThorlabsAPT
+import pyThorlabsAPT.driver_virtual
+import pyThorlabsAPT.driver
 
 graphics_dir = os.path.join(os.path.dirname(__file__), 'graphics')
 
@@ -33,13 +34,7 @@ class interface(abstract_instrument_interface.abstract_interface):
         Name of the physical device currently connected to this interface 
     settings = {    'step_size': 1,
                     'ramp' : {  
-                                'ramp_step_size': 1,
-                                'ramp_wait_1': 1,
-                                'ramp_wait_2': 1,
-                                'ramp_numb_steps': 10,
-                                'ramp_repeat': 1,
-                                'ramp_reverse': 1,
-                                'ramp_send_initial_trigger': 1
+                                ....
                                 }
                     }
     ramp 
@@ -86,33 +81,43 @@ class interface(abstract_instrument_interface.abstract_interface):
         ### Default values of settings (might be overlapped by settings saved in .json files later)
         self.settings = {   'step_size': 1,
                             'ramp' : {  
-                                        'ramp_step_size': 1,
-                                        'ramp_wait_1': 1,
-                                        'ramp_wait_2': 1,
-                                        'ramp_numb_steps': 10,
-                                        'ramp_repeat': 1,
-                                        'ramp_reverse': 1,
-                                        'ramp_send_initial_trigger': 1
+                                        'ramp_step_size': 1,            #Increment value of each ramp step
+                                        'ramp_wait_1': 1,               #Wait time (in s) after each ramp step
+                                        'ramp_send_trigger' : True,     #If true, the function self.func_trigger is called after each 'movement'
+                                        'ramp_wait_2': 1,               #Wait time (in s) after each (potential) call to trigger, before doing the new ramp step
+                                        'ramp_numb_steps': 10,          #Number of steps in the ramp
+                                        'ramp_repeat': 1,               #How many times the ramp is repeated
+                                        'ramp_reverse': 1,              #If True (or 1), it repeates the ramp in reverse
+                                        'ramp_send_initial_trigger': 1, #If True (or 1), it calls self.func_trigger before starting the ramp
+                                        'ramp_reset' : 1                #If True (or 1), it resets the value of the instrument to the initial one after the ramp is done
                                         }
                             }
         self.list_devices = []              #list of devices found 
         self.connected_device_name = ''
         self._units = {'mm':1,'deg':2}
         ###
-        self.instrument = pyThorlabsAPT() 
+        if ('virtual' in kwargs.keys()) and (kwargs['virtual'] == True):
+            self.instrument =  pyThorlabsAPT.driver_virtual. pyThorlabsAPT() 
+        else:    
+            self.instrument =  pyThorlabsAPT.driver. pyThorlabsAPT() 
         ###
         super().__init__(**kwargs)
 
         # Setting up the ramp object, which is defined in the package abstract_instrument_interface
-        self.ramp = abstract_instrument_interface.ramp(self)  
+        self.ramp = abstract_instrument_interface.ramp(interface=self)  
         self.ramp.set_ramp_settings(self.settings['ramp'])
         self.ramp.set_ramp_functions(func_move = self.instrument.move_by,
-                                     func_trigger = self.update, 
                                      func_check_step_has_ended = self.is_device_not_moving, 
+                                     func_trigger = self.update, 
+                                     func_trigger_continue_ramp = None,
+                                     func_set_value = self.set_position, 
+                                     func_read_current_value = self.read_position, 
                                      list_functions_step_not_ended = [self.read_position],  
                                      list_functions_step_has_ended = [lambda:self.end_movement(send_signal=False)],  
                                      list_functions_ramp_ended = [])
         self.ramp.sig_ramp.connect(self.on_ramp_state_changed)
+        
+        self.refresh_list_devices()
 
     def refresh_list_devices(self):
         '''
@@ -120,16 +125,17 @@ class interface(abstract_instrument_interface.abstract_interface):
         '''            
         self.logger.info(f"Looking for devices...") 
         list_valid_devices = self.instrument.list_devices()
-        if(len(list_valid_devices)>0):
-            list_IDNs_and_devices = [str(dev[1]) + " --> " + str(dev[0]) for dev in list_valid_devices] 
+        self.logger.info(f"Found {len(list_valid_devices)} devices.") 
+        self.list_devices = list_valid_devices
+        self.send_list_devices()
+
+    def send_list_devices(self):
+        if(len(self.list_devices)>0):
+            list_IDNs_and_devices = [str(dev[1]) + " --> " + str(dev[0]) for dev in self.list_devices] 
         else:
             list_IDNs_and_devices =[]
-            #list_IDNs_and_devices = [i for i in list_IDN] 
-            #self.gui.combo_Devices.addItems(list_IDNs_and_devices)  
-        self.logger.info(f"Found {len(list_valid_devices)} devices.") 
-        self.sig_list_devices_updated.emit(list_IDNs_and_devices)
         self.list_IDNs_and_devices = list_IDNs_and_devices
-        return list_IDNs_and_devices
+        self.sig_list_devices_updated.emit(list_IDNs_and_devices)
 
     def connect_device(self,device_full_name):
         if(device_full_name==''): # Check  that the name is not empty
@@ -145,7 +151,7 @@ class interface(abstract_instrument_interface.abstract_interface):
                 self.connected_device_name = device_name
                 self.set_connected_state()
             else: #If connection was not successful
-                self.logger.error(f"Error: {Msg}")
+                self.logger.error(f"Errorr: {Msg}")
                 self.set_disconnected_state()
                 pass
         except Exception as e:
@@ -165,6 +171,7 @@ class interface(abstract_instrument_interface.abstract_interface):
             self.set_disconnected_state() #When disconnection is not succeful, it is typically because the device alredy lost connection
                                           #for some reason. In this case, it is still useful to have the widget reset to disconnected state                                       
     def close(self,**kwargs):
+        self.settings['ramp'] = self.ramp.settings
         super().close(**kwargs)     
         
     def set_connected_state(self):
@@ -342,7 +349,7 @@ class gui(abstract_instrument_interface.abstract_gui):
         
         ### SET INITIAL STATE OF WIDGETS
         self.edit_StepSize.setText(str(self.interface.settings['step_size']))
-        self.interface.refresh_list_devices()    #By calling this method, as soon as the gui is created we also look for devices
+        self.interface.send_list_devices() 
         self.on_moving_state_change(self.interface.SIG_MOVEMENT_ENDED)
         self.on_homing_state_change(self.interface.SIG_HOMING_ENDED)
         self.on_connection_status_change(self.interface.SIG_DISCONNECTED) #When GUI is created, all widgets are set to the "Disconnected" state              
@@ -351,8 +358,7 @@ class gui(abstract_instrument_interface.abstract_gui):
         """
         Creates all widgets and layout for the GUI. Any Widget and Layout must assigned to self.containter, which is a pyqt Layout object
         """ 
-        self.container = Qt.QVBoxLayout()
-        
+       
         #Use the custom connection/listdevices panel, defined in abstract_instrument_interface.abstract_gui
         hbox1, widgets_dict = self.create_panel_connection_listdevices()
         for key, val in widgets_dict.items(): 
@@ -360,7 +366,7 @@ class gui(abstract_instrument_interface.abstract_gui):
 
         hbox2 = Qt.QHBoxLayout()
         self.label_Position = Qt.QLabel("Position: ")
-        self.edit_Position = Qt.QLineEdit()
+        self.edit_Position = Qt.QLineEdit(self.parent)
         self.edit_Position.setAlignment(QtCore.Qt.AlignRight)
         #self.label_PositionUnits = Qt.QLabel(" deg")
         self.label_Move = Qt.QLabel("Move: ")
@@ -405,15 +411,29 @@ class gui(abstract_instrument_interface.abstract_gui):
         stageparams_hbox.addStretch(1)    
         stageparams_groupbox.setLayout(stageparams_hbox) 
         
-        self.ramp_groupbox = abstract_instrument_interface.ramp_gui(ramp=self.interface.ramp)
-                
-        self.container = Qt.QVBoxLayout()
+        self.ramp_groupbox = abstract_instrument_interface.ramp_gui(ramp_object=self.interface.ramp)     
+        
+        self.tabs = Qt.QTabWidget()
+        self.tab1 = Qt.QWidget()
+        self.container_tab1 = Qt.QVBoxLayout()
+        self.tab2 = Qt.QWidget()
+        self.container_tab2 = Qt.QVBoxLayout()
+        self.tabs.addTab(self.tab1,"General")
+        self.tabs.addTab(self.tab2,"Stage settings") 
+        
         for box in [hbox1,hbox2]:
-            self.container.addLayout(box)  
-        self.container.addWidget(self.ramp_groupbox)
-        self.container.addWidget(stageparams_groupbox)
-
-        self.container.addStretch(1)
+            self.container_tab1.addLayout(box)  
+        self.container_tab1.addWidget(self.ramp_groupbox)
+        self.container_tab1.addStretch(1)
+        
+        self.container_tab2.addWidget(stageparams_groupbox)
+        self.container_tab2.addStretch(1)
+        
+        self.tab1.setLayout(self.container_tab1)
+        self.tab2.setLayout(self.container_tab2)
+        
+        self.container = Qt.QVBoxLayout()
+        self.container.addWidget(self.tabs)
         
         # Widgets for which we want to constraint the width by using sizeHint()
         widget_list = [self.label_Position, self.label_Move, self.label_By, self.button_Home,stageparams_groupbox, self.button_Stop]
@@ -478,19 +498,12 @@ class gui(abstract_instrument_interface.abstract_gui):
     def on_moving_state_change(self,status):
         if status == self.interface.SIG_MOVEMENT_STARTED:
             self.disable_widget(self.widgets_disabled_when_moving)
-        if status == self.interface.SIG_MOVEMENT_ENDED:
+        if (status == self.interface.SIG_MOVEMENT_ENDED) and self.interface.ramp.is_not_doing_ramp(): #<-- ugly solution, it assumes that the ramp object exists
             self.enable_widget(self.widgets_disabled_when_moving)
             
     def on_homing_state_change(self,status):
         self.on_moving_state_change(status)
-    
-#    def on_ramp_state_change(self,status):
-#        if status == SIG_RAMP_STARTED:
-#            self.disable_widget(self.widgets_disabled_when_doing_ramp )
-#        if status == SIG_RAMP_ENDED:
-#            self.enable_widget(self.widgets_disabled_when_doing_ramp )
-#            self.set_connected_state()
-            
+             
     def on_step_size_change(self,value):
         self.edit_StepSize.setText(str(value))
         
@@ -560,11 +573,13 @@ class MainWindow(Qt.QWidget):
 def main():
     parser = argparse.ArgumentParser(description = "",epilog = "")
     parser.add_argument("-s", "--decrease_verbose", help="Decrease verbosity.", action="store_true")
+    parser.add_argument('-virtual', help=f"Initialize the virtual driver", action="store_true")
     args = parser.parse_args()
+    virtual = args.virtual
     
     app = Qt.QApplication(sys.argv)
     window = MainWindow()
-    Interface = interface(app=app) 
+    Interface = interface(app=app,virtual=virtual) 
     Interface.verbose = not(args.decrease_verbose)
     app.aboutToQuit.connect(Interface.close) 
     view = gui(interface = Interface, parent=window) #In this case window is the parent of the gui

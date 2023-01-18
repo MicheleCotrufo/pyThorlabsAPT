@@ -21,7 +21,7 @@ class pyThorlabsAPT(apt.Motor):
         Returns
         -------
         list_valid_devices, list
-            A list of all found valid devices. Each element of the list is a list of three strings, in the format [address,identity,model]
+            A list of all found valid devices. Each element of the list is a list of three strings, in the format [identity,address]
 
         '''
         apt_core._cleanup()                         #By calling the _cleanup method here, we make sure that list_devices can discover devices that were plugged in after the creation of this object

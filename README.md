@@ -5,6 +5,8 @@ low-level driver to perform basic operations, and a high-level GUI, written with
 package [thorlabs_apt](https://github.com/qpit/thorlabs_apt), with a few tweaks to speed up loading time and error handling.
 Since [thorlabs_apt](https://github.com/qpit/thorlabs_apt) is not available via ```pip```, its code has been embedded in the code of this package, [here](https://github.com/MicheleCotrufo/pyThorlabsAPT/tree/master/pyThorlabsAPT/thorlabs_apt).
 
+The interface can work either as a stand-alone application, or as a module of [ergastirio]([https://github.com/qpit/thorlabs_apt](https://github.com/MicheleCotrufo/ergastirio)).
+
 ## Table of Contents
  - [Installation](#installation)
   - [Usage via the low-level driver](#usage-via-the-low-level-driver)
@@ -18,8 +20,10 @@ The package uses the Thorlabs APT.dll shared library, and therefore it only work
 
 1. Install the script via the package manager pip,
 ```bash
-pip install pyThorlabsAPT
+pip install pyThorlabsAPT==0.11
 ```
+Important: due to a bug of pypi, if you run just '''pip install pyThorlabsAPT''' it will default to version 0.21, which was wrongly uploaded on pypi in the past and it does not work. Make sure you specify the version
+
 2. Install the APT software from [here](https://www.thorlabs.com/software_pages/ViewSoftwarePage.cfm?Code=Motion_Control). The version of the software (32 or 64 bit) must match the one of your python installation.
 
 3. Locate the file APT.dll which has been installed on your computer by the APT software. This file will typically be in the folder "[APT Installation Folder]\APT Server", where

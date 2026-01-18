@@ -5,7 +5,7 @@ low-level driver to perform basic operations, and a high-level GUI, written with
 package [thorlabs_apt](https://github.com/qpit/thorlabs_apt), with a few tweaks to speed up loading time and error handling.
 Since [thorlabs_apt](https://github.com/qpit/thorlabs_apt) is not available via ```pip```, its code has been embedded in the code of this package, [here](https://github.com/MicheleCotrufo/pyThorlabsAPT/tree/master/pyThorlabsAPT/thorlabs_apt).
 
-The interface can work either as a stand-alone application, or as a module of [ergastirio]([https://github.com/qpit/thorlabs_apt](https://github.com/MicheleCotrufo/ergastirio)).
+The interface can work either as a stand-alone application, or as a module of [ergastirio](https://github.com/MicheleCotrufo/ergastirio).
 
 ## Table of Contents
  - [Installation](#installation)

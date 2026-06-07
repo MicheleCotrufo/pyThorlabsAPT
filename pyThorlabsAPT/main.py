@@ -151,7 +151,7 @@ class interface(abstract_instrument_interface.abstract_interface):
                 self.connected_device_name = device_name
                 self.set_connected_state()
             else: #If connection was not successful
-                self.logger.error(f"Errorr: {Msg}")
+                self.logger.error(f"Error: {Msg}")
                 self.set_disconnected_state()
                 pass
         except Exception as e:
@@ -172,7 +172,15 @@ class interface(abstract_instrument_interface.abstract_interface):
                                           #for some reason. In this case, it is still useful to have the widget reset to disconnected state                                       
     def close(self,**kwargs):
         self.settings['ramp'] = self.ramp.settings
-        super().close(**kwargs)     
+        super().close(**kwargs) 
+        
+    @property
+    def position(self):
+        return self.read_position()
+
+    @position.setter
+    def position(self, value):
+        self.set_position(value)
         
     def set_connected_state(self):
         super().set_connected_state()
@@ -381,6 +389,7 @@ class gui(abstract_instrument_interface.abstract_gui):
         self.edit_StepSize.setToolTip('')
         self.button_Home = Qt.QPushButton("Home")
         self.button_Stop = Qt.QPushButton("Stop any movement")
+        #self.button_Stop.setFocusPolicy(QtCore.Qt.NoFocus)
         widgets_row2 = [self.label_Position,self.edit_Position,self.label_Move,self.button_MoveNegative,self.button_MovePositive,self.label_By,self.edit_StepSize,self.button_Home,self.button_Stop]
         widgets_row2_stretches = [0]*len(widgets_row2)
         for w,s in zip(widgets_row2,widgets_row2_stretches):
@@ -445,7 +454,7 @@ class gui(abstract_instrument_interface.abstract_gui):
                                                self.label_Move,self.button_MoveNegative,self.button_MovePositive,self.label_By,self.edit_StepSize,self.button_Home,self.button_set_stageparams
                                                ] + widgets_row4_stageparams
         #These widgets are enabled ONLY when interface is connected to a device
-        self.widgets_enabled_when_connected = [self.combo_Devices , self.button_RefreshDeviceList,
+        self.widgets_enabled_when_connected = [self.combo_Devices , self.button_RefreshDeviceList, #This line should be removed?
                                                self.label_Position, self.edit_Position,self.button_Home,self.button_Stop,
                                                self.label_Move,self.button_MoveNegative,self.button_MovePositive,self.label_By,self.edit_StepSize,self.button_Home,self.button_set_stageparams,
                                                ] + widgets_row4_stageparams
@@ -497,9 +506,11 @@ class gui(abstract_instrument_interface.abstract_gui):
             
     def on_moving_state_change(self,status):
         if status == self.interface.SIG_MOVEMENT_STARTED:
-            self.disable_widget(self.widgets_disabled_when_moving)
+            #self.disable_widget(self.widgets_disabled_when_moving)
+            pass #avoid disabling widgets because it forces the scrollarea to scroll
         if (status == self.interface.SIG_MOVEMENT_ENDED) and self.interface.ramp.is_not_doing_ramp(): #<-- ugly solution, it assumes that the ramp object exists
-            self.enable_widget(self.widgets_disabled_when_moving)
+            #self.enable_widget(self.widgets_disabled_when_moving)
+            pass
             
     def on_homing_state_change(self,status):
         self.on_moving_state_change(status)

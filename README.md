@@ -24,7 +24,7 @@ pip install pyThorlabsAPT==0.11
 ```
 Important: due to a bug of pypi, if you run just '''pip install pyThorlabsAPT''' it will default to version 0.21, which was wrongly uploaded on pypi in the past and it does not work. Make sure you specify the version
 
-2. Install the APT software from [here](https://www.thorlabs.com/software_pages/ViewSoftwarePage.cfm?Code=Motion_Control). The version of the software (32 or 64 bit) must match the one of your python installation.
+2. Install the APT software from [here](https://www.thorlabs.com/software-pages/motion_control/) (clik on the tab 'Archive'). The version of the software (32 or 64 bit) must match the one of your python installation.
 
 3. Locate the file APT.dll which has been installed on your computer by the APT software. This file will typically be in the folder "[APT Installation Folder]\APT Server", where
 [APT Installation Folder] is the installation folder of the APT software (typically [APT Installation Folder] = C:\Program Files\Thorlabs\APT). Copy the APT.dll into one of these locations:

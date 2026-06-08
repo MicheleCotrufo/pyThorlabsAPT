@@ -65,7 +65,3 @@ class pyThorlabsAPT(apt.Motor):
             apt_core._cleanup()
             self.list_devices()
             raise RuntimeError("Device is already disconnected.")
-            
-
-
-    

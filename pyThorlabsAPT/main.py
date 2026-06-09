@@ -85,6 +85,12 @@ class interface(abstract_instrument_interface.abstract_interface):
     SIG_HOMING_ENDED = 2
 
     def __init__(self, **kwargs):
+        """Initialize the class instance.
+
+        Args: (Other Args are specified in the __init__ method of abstract_instrument_interface.abstract_interface)
+            no_ramp (bool, optional): If set true, the ramp is not generated for this interface
+
+        """
         self.output = {'Position':0} 
         ### Default values of settings (might be overlapped by settings saved in .json files later)
         self.settings = {   
@@ -115,21 +121,24 @@ class interface(abstract_instrument_interface.abstract_interface):
         ###
         super().__init__(**kwargs)
 
-        # Setting up the ramp object, which is defined in the package abstract_instrument_interface
-        self.ramp = abstract_instrument_interface.ramp(interface=self)  
-        self.ramp.set_ramp_settings(self.settings['ramp'])
-        self.ramp.set_ramp_functions(func_move = self.jog_by,
-                                     func_check_step_has_ended = self.is_device_not_moving, 
-                                     func_trigger = self.update, 
-                                     func_trigger_continue_ramp = None,
-                                     func_set_value = self.set_position, 
-                                     func_read_current_value = self.read_position, 
-                                     list_functions_step_not_ended = [self.read_position],  
-                                     list_functions_step_has_ended = [lambda:self.end_movement(send_signal=False)],  
-                                     list_functions_ramp_ended = [])
-        self.ramp.sig_ramp.connect(self.on_ramp_state_changed)
+        self._add_ramp = not kwargs.get('no_ramp')
+
+        if self._add_ramp:
+            # Setting up the ramp object, which is defined in the package abstract_instrument_interface
+            self.ramp = abstract_instrument_interface.ramp(interface=self)  
+            self.ramp.set_ramp_settings(self.settings['ramp'])
+            self.ramp.set_ramp_functions(func_move = self.jog_by,
+                                        func_check_step_has_ended = self.is_device_not_moving, 
+                                        func_trigger = self.update, 
+                                        func_trigger_continue_ramp = None,
+                                        func_set_value = self.set_position, 
+                                        func_read_current_value = self.read_position, 
+                                        list_functions_step_not_ended = [self.read_position],  
+                                        list_functions_step_has_ended = [lambda:self.end_movement(send_signal=False)],  
+                                        list_functions_ramp_ended = [])
+            self.ramp.sig_ramp.connect(self.on_ramp_state_changed)
         
-        self.refresh_list_devices()
+        #self.refresh_list_devices()
 
     def refresh_list_devices(self):
         '''
@@ -189,7 +198,8 @@ class interface(abstract_instrument_interface.abstract_interface):
             self.set_disconnected_state() #When disconnection is not succeful, it is typically because the device alredy lost connection
                                           #for some reason. In this case, it is still useful to have the widget reset to disconnected state                                       
     def close(self,**kwargs):
-        self.settings['ramp'] = self.ramp.settings
+        if self._add_ramp:
+            self.settings['ramp'] = self.ramp.settings
         super().close(**kwargs)     
         
     def set_connected_state(self):
@@ -635,7 +645,8 @@ class gui(abstract_instrument_interface.abstract_gui):
         stageparams_hbox.addStretch(1)    
         stageparams_groupbox.setLayout(stageparams_hbox) 
         
-        self.ramp_groupbox = abstract_instrument_interface.ramp_gui(ramp_object=self.interface.ramp)     
+        if hasattr(self.interface, 'ramp'):
+            self.ramp_groupbox = abstract_instrument_interface.ramp_gui(ramp_object=self.interface.ramp)     
         
         self.tabs = Qt.QTabWidget()
         self.tab1 = Qt.QWidget()
@@ -647,7 +658,8 @@ class gui(abstract_instrument_interface.abstract_gui):
         
         for box in [hbox1,hbox2,hbox3]:
             self.container_tab1.addLayout(box)  
-        self.container_tab1.addWidget(self.ramp_groupbox)
+        if hasattr(self.interface, 'ramp'):    
+            self.container_tab1.addWidget(self.ramp_groupbox)
         self.container_tab1.addStretch(1)
         
         self.container_tab2.addWidget(stageparams_groupbox)
@@ -740,9 +752,13 @@ class gui(abstract_instrument_interface.abstract_gui):
     def on_moving_state_change(self,status):
         if status == self.interface.SIG_MOVEMENT_STARTED:
             self.disable_widget(self.widgets_disabled_when_moving)
-        if (status == self.interface.SIG_MOVEMENT_ENDED) and self.interface.ramp.is_not_doing_ramp(): #<-- ugly solution, it assumes that the ramp object exists
-            self.enable_widget(self.widgets_disabled_when_moving)
-            
+        if (status == self.interface.SIG_MOVEMENT_ENDED):
+            if hasattr(self.interface, 'ramp'):
+                if self.interface.ramp.is_not_doing_ramp(): 
+                    self.enable_widget(self.widgets_disabled_when_moving)
+            else:
+                self.enable_widget(self.widgets_disabled_when_moving)
+
     def on_homing_state_change(self,status):
         self.on_moving_state_change(status)
  

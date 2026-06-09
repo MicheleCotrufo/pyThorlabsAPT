@@ -1439,7 +1439,7 @@ def _load_library():
     return lib
 
 _lib = None
-_lib = _load_library()
+#_lib = _load_library()
 
 import atexit
 @atexit.register

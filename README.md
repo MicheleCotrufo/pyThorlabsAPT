@@ -29,7 +29,7 @@ The package uses the Thorlabs APT.dll shared library, and therefore the low-leve
 ```bash
 pip install pyThorlabsAPT==0.11
 ```
-Important: due to a bug of pypi, if you run just '''pip install pyThorlabsAPT''' it will default to version 0.21, which was wrongly uploaded on pypi in the past and it does not work. Make sure you specify the version
+Important: due to a bug of pypi, if you run just '''pip install pyThorlabsAPT''' it might default to a stale version 0.21, which was wrongly uploaded on pypi in the past and it does not work. Make sure you specify the version.
 
 2. Install the APT software from [here](https://www.thorlabs.com/software-pages/motion_control/) (clik on the tab 'Archive'). The version of the software (32 or 64 bit) must match the one of your python installation.
 
@@ -46,7 +46,7 @@ Steps 2 and 3 are only needed to talk to real hardware; they can be skipped enti
 These steps are enough to run the low-level driver of ```pyThorlabsAPT```. In order to use the GUI, it is necessary to install additional libraries,
 specified in the ```requirements.txt``` file,
 ```bash
-pip install abstract_instrument_interface>=0.6
+pip install abstract_instrument_interface>=0.10
 pip install "PyQt5>=5.15.6"
 pip install pyqtgraph
 pip install numpy
@@ -58,7 +58,7 @@ pip install numpy
 
 The class `pyThorlabsAPT` wraps the connected device's low-level `Motor` object (defined in [thorlabs_apt](https://github.com/qpit/thorlabs_apt) for real hardware, or in
 `pyThorlabsAPT.thorlabs_apt_virtual` for the simulated backend) and exposes the subset of its properties and methods needed to find, connect to, and operate a stage. A
-full list of properties, attributes, and methods is available here below.
+full list of properties, attributes, and methods is available below. **Note**: the documentation below was partially compiled with the help of Claude - mistakes are possible.
 
 ### Creating a driver instance
 
@@ -72,7 +72,7 @@ pyThorlabsAPT(virtual=False)
 
 ### Virtual mode (no hardware needed)
 
-Passing `virtual=True` makes the driver simulate two motors instead of talking to the real APT.dll. This is useful for testing or demoing the package without a physical
+Passing `virtual=True` makes the driver simulate APT motors instead of talking to the real APT.dll. Two virtual motors with different specs are available. This is useful for testing or demoing the package without a physical
 instrument, and works even if the Thorlabs APT software is not installed.
 
 ```python

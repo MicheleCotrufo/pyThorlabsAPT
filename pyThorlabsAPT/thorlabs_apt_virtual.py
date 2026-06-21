@@ -1,6 +1,6 @@
-'''Note: most of docstrings in this file have been generated automatically by Claude. AI can make mistakes'''
-
 """
+Note: most of docstrings in this file have been generated automatically by Claude. AI can make mistakes
+
 Drop-in replacement for pyThorlabsAPT.thorlabs_apt that simulates two Thorlabs APT motors.
 Exposes the same Motor / list_available_devices() API that driver.py uses, so that
 pyThorlabsAPT.driver.pyThorlabsAPT(virtual=True) can run without any real hardware, APT.dll, or

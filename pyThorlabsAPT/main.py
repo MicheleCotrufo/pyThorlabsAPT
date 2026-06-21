@@ -26,41 +26,93 @@ MOVE_REV = 2
 
 class interface(abstract_instrument_interface.abstract_interface):
     """
-    Create a high-level interface with the device, validates input data and perform high-level tasks such as periodically reading data from the instrument.
-    It uses signals (i.e. QtCore.pyqtSignal objects) to notify whenever relevant data has changes or event has happened. These signals are typically received by the GUI
-    Several general-purpose attributes and methods are defined in the class abstract_interface defined in abstract_instrument_interface
-    ...
+    High-level model for a Thorlabs APT motorized stage, built on top of
+    abstract_instrument_interface.abstract_interface.
 
-    Attributes specific for this class (see the abstract class abstract_instrument_interface.abstract_interface for general attributes)
-    ----------
-    instrument
-        Instance of driver.pyThorlabsAPT
-    connected_device_name : str
-        Name of the physical device currently connected to this interface 
-    settings = {    'step_size': 1,
-                    'ramp' : {  
-                                ....
-                                }
-                    }
-    ramp 
-        Instance of abstract_instrument_interface.ramp class 
+    Wraps a driver.pyThorlabsAPT driver instance (talking to real hardware, or to a simulated motor
+    via pyThorlabsAPT.thorlabs_apt_virtual if virtual=True), validates user input, and exposes device
+    state (position, moving/homing status, stage parameters, jog parameters) via Qt signals. Follows
+    the model-view-controller pattern: this class is the model, and gui is the view/controller.
+    Several general-purpose attributes and methods are defined in the parent class abstract_interface.
 
-    Methods defined in this class (see the abstract class abstract_instrument_interface.abstract_interface for general methods)
+    Class-level attributes
+    ----------------------
+    output : dict
+        Produced data. Key 'Position' holds the most recently read position (float). Initialized to
+        {'Position': 0}.
+
+    Signals
     -------
-    refresh_list_devices()
-        Get a list of compatible devices from the driver. Store them in self.list_devices, send signal to populate the combobox in the GUI.
-    connect_device(device_full_name)
-        Connect to the device identified by device_full_name
-    disconnect_device()
-        Disconnect the currently connected device
-    close()
-        Closes this interface, close plot window (if any was open), and calls the close() method of the parent class, which typically calls the disconnect_device method
-   
-    set_connected_state()
-        This method also calls the set_connected_state() method defined in abstract_instrument_interface.abstract_interface
+    sig_list_devices_updated : pyqtSignal(list)
+        Emitted when the list of available devices is refreshed. Carries the list of device name
+        strings shown in the GUI combo box.
+    sig_update_position : pyqtSignal(object)
+        Emitted whenever the position has been read or has changed. Carries the new position.
+    sig_change_moving_status : pyqtSignal(int)
+        Emitted when a movement starts or ends. Carries SIG_MOVEMENT_STARTED or SIG_MOVEMENT_ENDED.
+    sig_change_homing_status : pyqtSignal(int)
+        Emitted when homing starts or ends. Carries SIG_HOMING_STARTED or SIG_HOMING_ENDED.
+    sig_stage_info : pyqtSignal(list)
+        Emitted when the stage parameters have been written or read. Carries
+        [min_pos, max_pos, units, pitch] (see read_stage_info).
+    sig_jog_step_size : pyqtSignal(float)
+        Emitted when the jog step size has been changed or reset. Carries the current jog step size.
+    sig_jog_max_vel : pyqtSignal(float)
+        Emitted when the jog maximum velocity has been changed or reset. Carries the current value.
+    sig_jog_accel : pyqtSignal(float)
+        Emitted when the jog acceleration has been changed or reset. Carries the current value.
+    sig_jog_mode : pyqtSignal(int)
+        Emitted when the jog mode has been changed or reset. Carries the current jog mode.
+    sig_jog_stop_mode : pyqtSignal(int)
+        Emitted when the jog stop mode has been changed or reset. Carries the current jog stop mode.
 
-    TO FINISH
+    Status codes
+    ------------
+    (Other general-purpose codes, such as SIG_CONNECTED/SIG_DISCONNECTED, are defined in the parent
+    class abstract_interface.)
 
+    SIG_MOVEMENT_STARTED : int (= 1)
+        A movement (jog, home, or absolute move) has started.
+    SIG_MOVEMENT_ENDED : int (= 2)
+        A movement has ended.
+    SIG_HOMING_STARTED : int (= 1)
+        Homing has started. Carried by sig_change_homing_status, not sig_change_moving_status.
+    SIG_HOMING_ENDED : int (= 2)
+        Homing has ended. Carried by sig_change_homing_status, not sig_change_moving_status.
+
+    Instance attributes
+    --------------------
+    instrument : driver.pyThorlabsAPT
+        The low-level driver instance used to communicate with the device (real or virtual,
+        depending on the virtual kwarg passed to __init__).
+    list_devices : list
+        List of devices found by the most recent call to refresh_list_devices, as returned by the
+        driver's list_devices().
+    list_IDNs_and_devices : list of str
+        The devices in list_devices, formatted as "<address> --> <identity>" strings ready to
+        populate the GUI combo box. Set by send_list_devices.
+    connected_device_name : str
+        Address of the device currently connected to this interface, or '' if disconnected.
+    stage_info : list
+        [min_pos, max_pos, units, pitch] of the connected stage, with units as a string ('mm' or
+        'deg'). Set by read_stage_info.
+    settings : dict
+        'ramp' (dict): settings passed to the ramp object (see abstract_instrument_interface.ramp).
+        After a successful connection, also gains 'jog_mode', 'jog_stop_mode', 'jog_step_size',
+        'jog_min_vel', 'jog_acceleration', 'jog_max_vel' (see get_jog_params/set_jog_params).
+    ramp : abstract_instrument_interface.ramp
+        Instance of the ramp class, used to perform automated ramps of the position. Only created if
+        the no_ramp kwarg was not set to True.
+    _add_ramp : bool
+        Whether a ramp object was created (the negation of the no_ramp kwarg).
+    _units : dict
+        Maps the unit strings used in the GUI/settings ('mm', 'deg') to the integer codes used by the
+        driver (1, 2 respectively).
+    _jog_directions : dict
+        Maps the direction convention used by jog()/jog_by() (1 = forward, -1 = backward) to the
+        MOVE_FWD/MOVE_REV codes expected by the driver's move_jog().
+    _jog_directions_string : dict
+        Maps the same direction convention (1, -1) to 'forward'/'backward' strings, used for logging.
     """
 
     output = {'Position':0}  #We define this also as class variable, to make it possible to see which data is produced by this interface without having to create an object
@@ -78,7 +130,7 @@ class interface(abstract_instrument_interface.abstract_interface):
     sig_jog_max_vel = QtCore.pyqtSignal(float)              #   | Jog max vel has been changed or resetted                  | Jog Max Vel
     sig_jog_accel = QtCore.pyqtSignal(float)                #   | Jog acceleration has been changed or resetted             | Jog Acceleration
     sig_jog_mode = QtCore.pyqtSignal(int)                   #   | Jog mode has been changed or resetted                     | Jog Mode
-    sig_jog_stop_mode = QtCore.pyqtSignal(int)              #   | Jog stop mode has been changed or resetted                | Jog Stod Mode
+    sig_jog_stop_mode = QtCore.pyqtSignal(int)              #   | Jog stop mode has been changed or resetted                | Jog Stop Mode
     
     
     ##
@@ -153,6 +205,11 @@ class interface(abstract_instrument_interface.abstract_interface):
         self.send_list_devices()
 
     def send_list_devices(self):
+        '''
+        Format the devices currently stored in self.list_devices as "<address> --> <identity>"
+        strings, store them in self.list_IDNs_and_devices, and emit sig_list_devices_updated so the
+        GUI combo box can be refreshed. Emits an empty list if no devices are found.
+        '''
         if(len(self.list_devices)>0):
             list_IDNs_and_devices = [str(dev[1]) + " --> " + str(dev[0]) for dev in self.list_devices] 
         else:
@@ -161,6 +218,21 @@ class interface(abstract_instrument_interface.abstract_interface):
         self.sig_list_devices_updated.emit(list_IDNs_and_devices)
 
     def connect_device(self,device_full_name):
+        '''
+        Connect to the device identified by device_full_name.
+
+        Parameters
+        ----------
+        device_full_name : str
+            A string of the form "<address> --> <identity>", as produced by send_list_devices and
+            displayed in the GUI combo box. The device address is extracted from the part before
+            " --> ". If empty, an error is logged and the method returns immediately.
+
+        Notes
+        -----
+        On success, reads (or applies, if previously stored in the config file) the jog parameters,
+        then calls set_connected_state. On failure, calls set_disconnected_state and logs an error.
+        '''
         if(device_full_name==''): # Check  that the name is not empty
             self.logger.error("No valid device has been selected")
             return
@@ -188,6 +260,13 @@ class interface(abstract_instrument_interface.abstract_interface):
             self.set_disconnected_state()
 
     def disconnect_device(self):
+        '''
+        Disconnect the currently connected device.
+
+        Calls the driver's disconnect_device, then calls set_disconnected_state regardless of
+        whether disconnection succeeded (e.g. if the device was already physically unplugged, it is
+        still useful to have the GUI reset to the disconnected state).
+        '''
         self.logger.info(f"Disconnecting from device {self.connected_device_name}...")
         self.set_disconnecting_state()
         (Msg,ID) = self.instrument.disconnect_device()
@@ -200,28 +279,63 @@ class interface(abstract_instrument_interface.abstract_interface):
             self.set_disconnected_state() #When disconnection is not succeful, it is typically because the device alredy lost connection
                                           #for some reason. In this case, it is still useful to have the widget reset to disconnected state                                       
     def close(self,**kwargs):
+        '''
+        Close this interface. Saves the current ramp settings (if a ramp was created), then delegates
+        to the parent class close(), which typically disconnects the device.
+        '''
         if self._add_ramp:
             self.settings['ramp'] = self.ramp.settings
-        super().close(**kwargs)     
-        
+        super().close(**kwargs)
+
     def set_connected_state(self):
+        '''
+        Extend the parent set_connected_state to perform APT-specific initialization after a
+        successful connection: reads and emits the current position and stage parameters.
+        '''
         super().set_connected_state()
         self.read_position()
-        self.read_stage_info()         
-        
+        self.read_stage_info()
+
     def set_moving_state(self):
+        '''
+        Emit sig_change_moving_status with SIG_MOVEMENT_STARTED, to notify the GUI that a movement
+        has begun.
+        '''
         self.sig_change_moving_status.emit(self.SIG_MOVEMENT_STARTED)
-                             
-    def set_non_moving_state(self): 
+
+    def set_non_moving_state(self):
+        '''
+        Emit sig_change_moving_status with SIG_MOVEMENT_ENDED, to notify the GUI that the current
+        movement has ended.
+        '''
         self.sig_change_moving_status.emit(self.SIG_MOVEMENT_ENDED)
 
     def is_device_moving(self):
+        '''
+        Returns whether the connected device is currently in motion.
+
+        Returns
+        -------
+        bool
+        '''
         return self.instrument.is_in_motion
 
     def is_device_not_moving(self):
+        '''
+        Returns whether the connected device is currently NOT in motion (the negation of
+        is_device_moving).
+
+        Returns
+        -------
+        bool
+        '''
         return not(self.instrument.is_in_motion)
 
     def stop_any_movement(self):
+        '''
+        Stop any ongoing movement of the device (profiled stop). Logs an error instead, without
+        raising, if the device is not currently moving.
+        '''
         if self.is_device_not_moving():
             self.logger.error(f"Motors cannot be stopped because they are not moving.")
         else:
@@ -257,7 +371,22 @@ class interface(abstract_instrument_interface.abstract_interface):
         # return True
         
     def set_jog_step_size(self,s):
-        try: 
+        '''
+        Validate and apply a new jog step size.
+
+        Parameters
+        ----------
+        s : str or float
+            Desired jog step size. Must be convertible to float.
+
+        Returns
+        -------
+        bool
+            True if the value was accepted (or was already set to this value), False if it was
+            invalid. On failure, sig_jog_step_size is emitted with the current (unchanged) value so
+            the GUI can revert.
+        '''
+        try:
             step_size = float(s)
             if self.settings['jog_step_size'] == step_size: #if the value passed is the same as the one currently stored, we end here
                 return True
@@ -277,7 +406,22 @@ class interface(abstract_instrument_interface.abstract_interface):
             return False    
         
     def set_jog_max_vel(self,mv):
-        try: 
+        '''
+        Validate and apply a new jog maximum velocity.
+
+        Parameters
+        ----------
+        mv : str or float
+            Desired jog maximum velocity. Must be convertible to float and positive.
+
+        Returns
+        -------
+        bool
+            True if the value was accepted (or was already set to this value), False if it was
+            invalid. On failure, sig_jog_max_vel is emitted with the current (unchanged) value so the
+            GUI can revert.
+        '''
+        try:
             max_vel = float(mv)
             if self.settings['jog_max_vel'] == max_vel: #if the value passed is the same as the one currently stored, we end here
                 return True
@@ -303,7 +447,22 @@ class interface(abstract_instrument_interface.abstract_interface):
             return False
             
     def set_jog_accel(self,ac):
-        try: 
+        '''
+        Validate and apply a new jog acceleration.
+
+        Parameters
+        ----------
+        ac : str or float
+            Desired jog acceleration. Must be convertible to float and positive.
+
+        Returns
+        -------
+        bool
+            True if the value was accepted (or was already set to this value), False if it was
+            invalid. On failure, sig_jog_accel is emitted with the current (unchanged) value so the
+            GUI can revert.
+        '''
+        try:
             max_acc = float(ac)
             if self.settings['jog_acceleration'] == max_acc: #if the value passed is the same as the one currently stored, we end here
                 return True
@@ -329,7 +488,22 @@ class interface(abstract_instrument_interface.abstract_interface):
             return False
             
     def set_jog_mode(self,mode):
-        try: 
+        '''
+        Validate and apply a new jog mode.
+
+        Parameters
+        ----------
+        mode : str or int
+            Desired jog mode. Must be convertible to int and be either 1 or 2.
+
+        Returns
+        -------
+        bool
+            True if the value was accepted (or was already set to this value), False if it was
+            invalid. On failure, sig_jog_mode is emitted with the current (unchanged) value so the
+            GUI can revert.
+        '''
+        try:
             mode = int(mode)
             if self.settings['jog_mode'] == mode: #if the value passed is the same as the one currently stored, we end here
                 return True
@@ -355,7 +529,22 @@ class interface(abstract_instrument_interface.abstract_interface):
             return False
             
     def set_jog_stop_mode(self,mode):
-        try: 
+        '''
+        Validate and apply a new jog stop mode.
+
+        Parameters
+        ----------
+        mode : str or int
+            Desired jog stop mode. Must be convertible to int and be either 1 or 2.
+
+        Returns
+        -------
+        bool
+            True if the value was accepted (or was already set to this value), False if it was
+            invalid. On failure, sig_jog_stop_mode is emitted with the current (unchanged) value so
+            the GUI can revert.
+        '''
+        try:
             mode = int(mode)
             if self.settings['jog_stop_mode'] == mode: #if the value passed is the same as the one currently stored, we end here
                 return True
@@ -381,6 +570,15 @@ class interface(abstract_instrument_interface.abstract_interface):
             return False
         
     def get_jog_params(self):
+        '''
+        Read the current jog parameters from the connected device and store them in self.settings
+        (keys jog_mode, jog_stop_mode, jog_step_size, jog_min_vel, jog_acceleration, jog_max_vel).
+
+        Returns
+        -------
+        bool
+            Always True.
+        '''
         Mode, StopMode, StepSize, MinVel, Accn, MaxVel =self.instrument.get_jog_parameters()
         self.settings['jog_mode'] = Mode
         self.settings['jog_stop_mode'] = StopMode
@@ -389,12 +587,29 @@ class interface(abstract_instrument_interface.abstract_interface):
         self.settings['jog_acceleration'] = Accn
         self.settings['jog_max_vel'] = MaxVel
         return True
-        
+
     def set_jog_params(self):
+        '''
+        Apply the jog parameters currently stored in self.settings to the connected device.
+
+        Returns
+        -------
+        bool
+            Always True.
+        '''
         self.instrument.set_jog_parameters(self.settings['jog_mode'], self.settings['jog_stop_mode'], self.settings['jog_step_size'], self.settings['jog_min_vel'], self.settings['jog_acceleration'], self.settings['jog_max_vel'])
         return True
     
     def home(self):
+        '''
+        Start homing the device. Logs an error instead, without raising, if the device is already
+        moving.
+
+        Emits sig_change_homing_status (SIG_HOMING_STARTED) and sig_change_moving_status
+        (via set_moving_state) immediately, then polls self.instrument.is_in_motion: while True, reads
+        and emits the current position; once it becomes False, calls end_movement and emits
+        sig_change_homing_status (SIG_HOMING_ENDED).
+        '''
         if self.is_device_moving():
             self.logger.error(f"Cannot start homing while device is moving.")
             return
@@ -413,6 +628,22 @@ class interface(abstract_instrument_interface.abstract_interface):
                                    ])
 
     def jog(self,direction):
+        '''
+        Start jogging the device in the given direction, by the step size and jog parameters
+        currently stored in self.settings. Logs an error instead, without raising, if the device is
+        already moving or if direction is not a valid key of self._jog_directions.
+
+        Parameters
+        ----------
+        direction : int
+            +1 to jog forward, -1 to jog backward (keys of self._jog_directions).
+
+        Notes
+        -----
+        Emits sig_change_moving_status (via set_moving_state) immediately, then polls
+        self.instrument.is_in_motion: while True, reads and emits the current position; once it
+        becomes False, calls end_movement.
+        '''
         if self.is_device_moving():
             self.logger.error(f"Cannot jog while device is already moving.")
             return
@@ -427,6 +658,17 @@ class interface(abstract_instrument_interface.abstract_interface):
         self.check_property_until(lambda : self.instrument.is_in_motion,[True,False],[[self.read_position],[self.end_movement]])
         
     def jog_by(self,step):
+        '''
+        Jog the device by a specific step (used as the ramp's func_move). Updates the jog step size
+        (if different from the value currently stored) before jogging in the direction given by the
+        sign of step.
+
+        Parameters
+        ----------
+        step : float
+            Signed step size. Its sign determines the jog direction; its magnitude is applied as the
+            new jog step size.
+        '''
         direction = +1 if step > 0 else -1
         if not(step == self.settings['jog_step_size']):
             self.set_jog_step_size(step)
@@ -448,19 +690,34 @@ class interface(abstract_instrument_interface.abstract_interface):
         # self.check_property_until(lambda : self.instrument.is_in_motion,[True,False],[[self.read_position],[self.end_movement]])
         
     def end_movement(self,send_signal = True):
-        # When send_signal = False, the method self.set_non_moving_state() is NOT called, which means the signal self.sig_change_moving_status.emit(self.SIG_MOVEMENT_ENDED) is not emitted
-        # This is useful, e.g., when doing a ramp, when at each step of the ramp we want to read the position but we do not want to send the signal that the movement has ended, so that the GUI remains disabled
+        '''
+        Called when a movement (jog, home, or absolute move) has ended: reads and emits the final
+        position.
+
+        Parameters
+        ----------
+        send_signal : bool, optional
+            If True (default), also calls set_non_moving_state, emitting sig_change_moving_status
+            with SIG_MOVEMENT_ENDED. If False, this is skipped: useful e.g. during a ramp, when at
+            each step we want to read the position but not signal that the movement has ended, so
+            that the GUI remains disabled.
+        '''
         self.read_position()
         self.logger.info(f"Movement ended. New position = {self.output['Position']}")
         if send_signal:
             self.set_non_moving_state()
 
     def read_stage_info(self):
-        #    # Stage units
-        #    STAGE_UNITS_MM = 1
-        #    """Stage units in mm"""
-        #    STAGE_UNITS_DEG = 2
-        #    """Stage units in degrees"""
+        '''
+        Read the stage axis parameters (minimum position, maximum position, units, pitch) from the
+        connected device, store them in self.stage_info (with the units code converted to its string
+        key, e.g. 'mm' or 'deg', via self._units), and emit sig_stage_info.
+
+        Returns
+        -------
+        list
+            [min_pos, max_pos, units, pitch], with units as a string ('mm' or 'deg').
+        '''
         temp = list(self.instrument.get_stage_axis_info())
         temp[2] = list(self._units.keys())[list(self._units.values()).index(temp[2])]
         self.stage_info = temp
@@ -469,8 +726,29 @@ class interface(abstract_instrument_interface.abstract_interface):
         return self.stage_info
 
     def set_stage_info(self, min_pos, max_pos, units, pitch):
-        #units must be specified as a string, and it gets converted according to self._units = {'mm':1,'deg':2}
-        try: 
+        '''
+        Validate and apply new stage axis parameters to the connected device.
+
+        Parameters
+        ----------
+        min_pos : str or float
+            Minimum position. Must be convertible to float.
+        max_pos : str or float
+            Maximum position. Must be convertible to float.
+        units : str
+            Stage units. Must be one of the keys of self._units (currently 'mm' or 'deg'); converted
+            to the corresponding integer code before being sent to the driver.
+        pitch : str or float
+            Stage pitch. Must be convertible to float.
+
+        Returns
+        -------
+        bool
+            False if validation failed or an error occurred while setting the parameters on the
+            device. On success, read_stage_info is called to read back and emit the (possibly
+            adjusted) values; no explicit value is returned in that case.
+        '''
+        try:
             min_pos = float(min_pos)
             max_pos = float(max_pos)
             pitch = float(pitch)
@@ -489,11 +767,35 @@ class interface(abstract_instrument_interface.abstract_interface):
         self.read_stage_info()
 
     def read_position(self):
+        '''
+        Read the current position from the connected device, store it in self.output['Position'],
+        and emit sig_update_position.
+
+        Returns
+        -------
+        float
+            The current position.
+        '''
         self.output['Position'] = self.instrument.position
         self.sig_update_position.emit(self.output['Position'])
         return self.output['Position']
-        
+
     def set_position(self,position):
+        '''
+        Start an absolute move to the given position. Logs an error instead, without raising, if the
+        device is already moving; silently returns if position cannot be converted to float.
+
+        Parameters
+        ----------
+        position : str or float
+            Target absolute position. Must be convertible to float.
+
+        Notes
+        -----
+        Emits sig_change_moving_status (via set_moving_state) immediately, then polls
+        self.instrument.is_in_motion: while True, reads and emits the current position; once it
+        becomes False, calls end_movement.
+        '''
         if self.is_device_moving():
             self.logger.error(f"Cannot start moving while device is already moving.")
             return
@@ -514,10 +816,23 @@ class gui(abstract_instrument_interface.abstract_gui):
     ----------
     """
     def __init__(self,interface,parent):
+        '''
+        Parameters
+        ----------
+        interface : interface
+            The model object this GUI is the view/controller for.
+        parent : QWidget
+            Parent widget that will contain this GUI's container layout.
+        '''
         super().__init__(interface,parent)
         self.initialize()
-       
+
     def initialize(self):
+        '''
+        Build the full GUI: create widgets, wire their events, attach to the parent (via the
+        superclass), connect all model signals to their event slots, and set the initial state of all
+        widgets.
+        '''
         self.create_widgets()
         self.connect_widgets_events_to_functions()
         
@@ -694,6 +1009,10 @@ class gui(abstract_instrument_interface.abstract_gui):
                                                                         self.button_set_stageparams,self.button_Home] + widgets_row3
 
     def connect_widgets_events_to_functions(self):
+        '''
+        Wire all widget signals (button clicks, text edits returning) to their corresponding GUI
+        event handler methods. Called once by initialize.
+        '''
         self.button_RefreshDeviceList.clicked.connect(self.click_button_refresh_list_devices)
         self.button_ConnectDevice.clicked.connect(self.click_button_connect_disconnect)
         self.edit_Position.returnPressed.connect(self.press_enter_edit_Position)
@@ -719,6 +1038,17 @@ class gui(abstract_instrument_interface.abstract_gui):
 ###########################################################################################################
 
     def on_connection_status_change(self,status):
+        '''
+        Event slot connected to interface.sig_connected. Enables/disables the relevant widgets and
+        updates the connect/disconnect button's text based on the new connection status. When the
+        device has just connected, also populates the jog parameter text boxes from
+        interface.settings.
+
+        Parameters
+        ----------
+        status : int
+            One of interface.SIG_DISCONNECTED, SIG_DISCONNECTING, SIG_CONNECTING, SIG_CONNECTED.
+        '''
         if status == self.interface.SIG_DISCONNECTED:
             self.disable_widget(self.widgets_enabled_when_connected)
             self.enable_widget(self.widgets_enabled_when_disconnected)
@@ -743,13 +1073,39 @@ class gui(abstract_instrument_interface.abstract_gui):
             self.edit_JogStopMode.setText(str(self.interface.settings['jog_stop_mode']))
             
     def on_list_devices_updated(self,list_devices):
-        self.combo_Devices.clear()  #First we empty the combobox  
-        self.combo_Devices.addItems(list_devices) 
+        '''
+        Event slot connected to interface.sig_list_devices_updated. Repopulates the device combo box.
+
+        Parameters
+        ----------
+        list_devices : list of str
+            Device identifiers to display, as produced by interface.send_list_devices.
+        '''
+        self.combo_Devices.clear()  #First we empty the combobox
+        self.combo_Devices.addItems(list_devices)
 
     def on_position_change(self,position):
+        '''
+        Event slot connected to interface.sig_update_position. Updates the position text box.
+
+        Parameters
+        ----------
+        position : float
+            The new position.
+        '''
         self.edit_Position.setText(str(position))
-            
+
     def on_moving_state_change(self,status):
+        '''
+        Event slot connected to interface.sig_change_moving_status. Disables the widgets that should
+        not be touched while the device is moving; re-enables them once movement has ended (unless a
+        ramp is in progress, in which case they stay disabled).
+
+        Parameters
+        ----------
+        status : int
+            interface.SIG_MOVEMENT_STARTED or interface.SIG_MOVEMENT_ENDED.
+        '''
         if status == self.interface.SIG_MOVEMENT_STARTED:
             self.disable_widget(self.widgets_disabled_when_moving)
         if (status == self.interface.SIG_MOVEMENT_ENDED):
@@ -760,33 +1116,91 @@ class gui(abstract_instrument_interface.abstract_gui):
                 self.enable_widget(self.widgets_disabled_when_moving)
 
     def on_homing_state_change(self,status):
+        '''
+        Event slot connected to interface.sig_change_homing_status. Homing affects the same widgets
+        as a regular movement, so this simply delegates to on_moving_state_change.
+
+        Parameters
+        ----------
+        status : int
+            interface.SIG_HOMING_STARTED or interface.SIG_HOMING_ENDED (same int values as, but
+            distinct signal from, SIG_MOVEMENT_STARTED/ENDED).
+        '''
         self.on_moving_state_change(status)
- 
+
     def on_jog_step_size_change(self,value):
+        '''
+        Event slot connected to interface.sig_jog_step_size. Updates the jog step size text box.
+
+        Parameters
+        ----------
+        value : float
+        '''
         self.edit_JogStepSize.setText(str(value))
-        
+
     def on_jog_max_vel_change(self,value):
+        '''
+        Event slot connected to interface.sig_jog_max_vel. Updates the jog max velocity text box.
+
+        Parameters
+        ----------
+        value : float
+        '''
         self.edit_JogMaxVel.setText(str(value))
-        
+
     def on_jog_accel_change(self,value):
+        '''
+        Event slot connected to interface.sig_jog_accel. Updates the jog max acceleration text box.
+
+        Parameters
+        ----------
+        value : float
+        '''
         self.edit_JogAcc.setText(str(value))
-        
+
     def on_jog_mode_change(self,value):
+        '''
+        Event slot connected to interface.sig_jog_mode. Updates the jog mode text box.
+
+        Parameters
+        ----------
+        value : int
+        '''
         self.edit_JogMode.setText(str(value))
-        
+
     def on_jog_stop_mode_change(self,value):
+        '''
+        Event slot connected to interface.sig_jog_stop_mode. Updates the jog stop mode text box.
+
+        Parameters
+        ----------
+        value : int
+        '''
         self.edit_JogStopMode.setText(str(value))
- 
+
     #def on_step_size_change(self,value): # REMOVED, now using jogging for steps #
-    #    pass #self.edit_StepSize.setText(str(value)) 
-        
+    #    pass #self.edit_StepSize.setText(str(value))
+
     def on_stage_info_change(self,value):
-        self.edit_min_pos.setText(str(value[0])) 
-        self.edit_max_pos.setText(str(value[1])) 
-        self.edit_pitch.setText(str(value[3])) 
+        '''
+        Event slot connected to interface.sig_stage_info. Updates the stage parameter text boxes and
+        units combo box.
+
+        Parameters
+        ----------
+        value : list
+            [min_pos, max_pos, units, pitch], as produced by interface.read_stage_info.
+        '''
+        self.edit_min_pos.setText(str(value[0]))
+        self.edit_max_pos.setText(str(value[1]))
+        self.edit_pitch.setText(str(value[3]))
         self.edit_pitch.setCursorPosition(0)
         self.combo_units.setCurrentText(value[2])
+
     def on_close(self):
+        '''
+        Event slot connected to interface.sig_close. No GUI-specific cleanup is currently needed.
+        '''
         pass
         
 #######################
@@ -798,54 +1212,100 @@ class gui(abstract_instrument_interface.abstract_gui):
 ###################################################################################################################################################
 
     def click_button_refresh_list_devices(self):
+        '''Handler for the "Refresh" button. Calls interface.refresh_list_devices.'''
         self.interface.refresh_list_devices()
 
     def click_button_connect_disconnect(self):
-        if(self.interface.instrument.connected == False): # We attempt connection   
+        '''
+        Handler for the "Connect"/"Disconnect" button. Toggles the connection state of the
+        instrument: connects to the device currently selected in the combo box if disconnected,
+        disconnects if connected.
+        '''
+        if(self.interface.instrument.connected == False): # We attempt connection
             device_full_name = self.combo_Devices.currentText() # Get the device name from the combobox
             self.interface.connect_device(device_full_name)
         elif(self.interface.instrument.connected == True): # We attempt disconnection
             self.interface.disconnect_device()
-            
+
     def press_enter_edit_Position(self):
+        '''
+        Handler for the position text box (Return pressed). Calls interface.set_position with the
+        text box's current content.
+        '''
         return self.interface.set_position(self.edit_Position.text())
-    
+
     #def press_enter_edit_StepSize(self): # REMOVED, now using jogging for steps #
     #    pass
         #return self.interface.set_jog_step_size(self.edit_StepSize.text())
-        
+
     def press_enter_edit_JogStepSize(self):
+        '''
+        Handler for the jog step size text box (Return pressed). Calls interface.set_jog_step_size
+        with the text box's current content.
+        '''
         return self.interface.set_jog_step_size(self.edit_JogStepSize.text())
-    
+
     def press_enter_edit_JogMaxVel(self):
+        '''
+        Handler for the jog max velocity text box (Return pressed). Calls interface.set_jog_max_vel
+        with the text box's current content.
+        '''
         return self.interface.set_jog_max_vel(self.edit_JogMaxVel.text())
-        
+
     def press_enter_edit_JogAcc(self):
+        '''
+        Handler for the jog max acceleration text box (Return pressed). Calls
+        interface.set_jog_accel with the text box's current content.
+        '''
         return self.interface.set_jog_accel(self.edit_JogAcc.text())
-        
+
     def press_enter_edit_JogMode(self):
+        '''
+        Handler for the jog mode text box (Return pressed). Calls interface.set_jog_mode with the
+        text box's current content.
+        '''
         return self.interface.set_jog_mode(self.edit_JogMode.text())
-        
+
     def press_enter_edit_JogStopMode(self):
+        '''
+        Handler for the jog stop mode text box (Return pressed). Calls interface.set_jog_stop_mode
+        with the text box's current content.
+        '''
         return self.interface.set_jog_stop_mode(self.edit_JogStopMode.text())
-    
+
     #def click_button_Move(self,direction): # REMOVED, now using jogging for steps #
     #    pass
         #self.press_enter_edit_StepSize()
         #self.interface.jog(direction)
         #self.interface.move_single_step(direction)
-        
+
     def click_button_Jog(self,direction):
+        '''
+        Handler for the "<" and ">" jog buttons. Applies the jog step size text box's current
+        content, then calls interface.jog with the given direction.
+
+        Parameters
+        ----------
+        direction : int
+            +1 for the ">" button, -1 for the "<" button.
+        '''
         self.press_enter_edit_JogStepSize()
         self.interface.jog(direction)
-        
+
     def click_button_Home(self):
+        '''Handler for the "Home" button. Calls interface.home.'''
         self.interface.home()
 
     def click_button_Stop(self):
+        '''Handler for the "Stop any movement" button. Calls interface.stop_any_movement.'''
         self.interface.stop_any_movement()
 
     def click_button_set_stageparams(self):
+            '''
+            Handler for the "Set" button in the Stage Parameters group box. Calls
+            interface.set_stage_info with the current content of the min/max position, units, and
+            pitch widgets.
+            '''
             self.interface.set_stage_info( min_pos =   self.edit_min_pos.text(),
                                             max_pos =   self.edit_max_pos.text(),
                                             units =     self.combo_units.currentText(),
@@ -856,7 +1316,13 @@ class gui(abstract_instrument_interface.abstract_gui):
 #################################
 
 class MainWindow(Qt.QWidget):
+    '''
+    Top-level application window. Used as the parent widget for the gui object created in main().
+    '''
     def __init__(self):
+        '''
+        Create the window and set its title to the package name.
+        '''
         super().__init__()
         self.setWindowTitle(__package__)
         # Set the central widget of the Window.
@@ -866,6 +1332,18 @@ class MainWindow(Qt.QWidget):
 #        pass#self.child.close()
 
 def main():
+    '''
+    Entry point for running this package as a standalone application: parses command-line
+    arguments, creates the Qt application, the interface (model), and the gui (view/controller), and
+    starts the Qt event loop.
+
+    Command-line arguments
+    -----------------------
+    -s, --decrease_verbose
+        Decrease logging verbosity.
+    -virtual
+        Use the virtual driver (simulated motors) instead of real hardware.
+    '''
     parser = argparse.ArgumentParser(description = "",epilog = "")
     parser.add_argument("-s", "--decrease_verbose", help="Decrease verbosity.", action="store_true")
     parser.add_argument('-virtual', help=f"Initialize the virtual driver", action="store_true")

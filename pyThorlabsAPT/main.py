@@ -11,11 +11,15 @@ import sys
 import argparse
 
 import abstract_instrument_interface
-import pyThorlabsAPT.driver_virtual
 import pyThorlabsAPT.driver
-import pyThorlabsAPT.thorlabs_apt as apt
 
 graphics_dir = os.path.join(os.path.dirname(__file__), 'graphics')
+
+# Move direction codes used with move_jog(). Match pyThorlabsAPT.thorlabs_apt.MOVE_FWD/MOVE_REV (and
+# their pyThorlabsAPT.thorlabs_apt_virtual equivalents), defined here so that this file does not need
+# to import either backend module directly.
+MOVE_FWD = 1
+MOVE_REV = 2
 
 ##This application follows the model-view-controller paradigm, but with the view and controller defined inside the same object (the GUI)
 ##The model is defined by the class 'interface', and the view+controller is defined by the class 'gui'. 
@@ -111,13 +115,11 @@ class interface(abstract_instrument_interface.abstract_interface):
         self.connected_device_name = ''
         self._units = {'mm':1,'deg':2}
         
-        self._jog_directions = {1: apt.MOVE_FWD,-1: apt.MOVE_REV}
+        self._jog_directions = {1: MOVE_FWD,-1: MOVE_REV}
         self._jog_directions_string = {1: 'forward',-1: 'backward'}
         ###
-        if ('virtual' in kwargs.keys()) and (kwargs['virtual'] == True):
-            self.instrument =  pyThorlabsAPT.driver_virtual. pyThorlabsAPT() 
-        else:    
-            self.instrument =  pyThorlabsAPT.driver. pyThorlabsAPT() 
+        virtual = kwargs.get('virtual', False)
+        self.instrument = pyThorlabsAPT.driver.pyThorlabsAPT(virtual=virtual)
         ###
         super().__init__(**kwargs)
 

@@ -178,7 +178,7 @@ class interface(abstract_instrument_interface.abstract_interface):
                     self.set_jog_params() #This makes sure that the jog parameters currently store in self.settings are "applied" to the device.
                 self.set_connected_state()
             else: #If connection was not successful
-                self.logger.error(f"Errorr: {Msg}")
+                self.logger.error(f"Error: {Msg}")
                 self.set_disconnected_state()
                 pass
         except Exception as e:
@@ -399,7 +399,6 @@ class interface(abstract_instrument_interface.abstract_interface):
         self.logger.info(f"Homing device...")
         self.set_moving_state()
         self.sig_change_homing_status.emit(self.SIG_HOMING_STARTED)
-        self.sig_change_moving_status.emit(self.SIG_MOVEMENT_STARTED)
         self.instrument.move_home()
         #Start checking periodically the value of self.instrument.is_in_motion. It it's true, we read current
         #position and update it in the GUI. When it becomes False, call self.end_movement
@@ -407,8 +406,7 @@ class interface(abstract_instrument_interface.abstract_interface):
                                   [
                                       [self.read_position],
                                       [self.end_movement,
-                                       lambda x=None:self.sig_change_homing_status.emit(self.SIG_HOMING_ENDED),
-                                       lambda x=None:self.sig_change_moving_status.emit(self.SIG_MOVEMENT_ENDED)
+                                       lambda x=None:self.sig_change_homing_status.emit(self.SIG_HOMING_ENDED)
                                       ]
                                    ])
 
@@ -598,13 +596,13 @@ class gui(abstract_instrument_interface.abstract_gui):
         self.button_JogPositive.setMaximumWidth(30)
         self.label_JogBy  = Qt.QLabel("By ")
         self.edit_JogStepSize = Qt.QLineEdit()
-        self.edit_JogStepSize.setToolTip('Unis are typically mm or deg. Check the specs of your APT controller/motor')
+        self.edit_JogStepSize.setToolTip('Units are typically mm or deg. Check the specs of your APT controller/motor')
         self.label_JogMaxVel  = Qt.QLabel("Max Vel.:")
         self.edit_JogMaxVel = Qt.QLineEdit()
-        self.edit_JogMaxVel.setToolTip('Unis are typically mm/s or deg/s. Check the specs of your APT controller/motor')
+        self.edit_JogMaxVel.setToolTip('Units are typically mm/s or deg/s. Check the specs of your APT controller/motor')
         self.label_JogAcc  = Qt.QLabel("Max Accel.:")
         self.edit_JogAcc = Qt.QLineEdit()
-        self.edit_JogAcc.setToolTip('Unis are typically mm/s^2 or deg/s^2. Check the specs of your APT controller/motor')
+        self.edit_JogAcc.setToolTip('Units are typically mm/s^2 or deg/s^2. Check the specs of your APT controller/motor')
         self.label_JogMode  = Qt.QLabel("Jog Mode:")
         self.edit_JogMode = Qt.QLineEdit()
         self.edit_JogMode.setToolTip('Leave this unchanged unless you know what you are doing.')
@@ -861,9 +859,9 @@ class MainWindow(Qt.QWidget):
         self.setWindowTitle(__package__)
         # Set the central widget of the Window.
         # self.setCentralWidget(self.container)
-    def closeEvent(self, event):
-        #if self.child:
-        pass#self.child.close()
+#    def closeEvent(self, event):
+#        #if self.child:
+#        pass#self.child.close()
 
 def main():
     parser = argparse.ArgumentParser(description = "",epilog = "")

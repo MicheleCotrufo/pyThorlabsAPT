@@ -1,13 +1,13 @@
-import pyThorlabsAPT.thorlabs_apt as apt
-import pyThorlabsAPT.thorlabs_apt.core as apt_core
-
 """
 The class pyThorlabsAPT acts as a wrapper for apt.Motor, and inherits all its methods. It provides improved functions to find all devices, and connect and disconnect to a device 
 """
 
+import pyThorlabsAPT.thorlabs_apt as apt
+import pyThorlabsAPT.thorlabs_apt.core as apt_core
+
 class pyThorlabsAPT(apt.Motor):
 
-    def __init__(self,model=None):
+    def __init__(self):
         self.connected = False
         #Ideally, we would initialize the library here by using the first two lines of code in the list_devices method below.
         #However, the method list_devices (which might be called by the user later) needs to re-initialize the library in order to discover devices that were plugged in after that last library re-initialization
@@ -40,7 +40,7 @@ class pyThorlabsAPT(apt.Motor):
                 ID = 1
             except Exception as e:
                 ID = 0 
-                Msg = e
+                Msg = str(e)
         else:
             raise ValueError("The specified address is not a valid device address.")
         if(ID==1):
@@ -54,7 +54,7 @@ class pyThorlabsAPT(apt.Motor):
                 apt_core._cleanup()
                 self.list_devices()
                 ID = 1
-                Msg = 'Succesfully disconnected.'
+                Msg = 'Successfully disconnected.'
             except Exception as e:
                 ID = 0 
                 Msg = e

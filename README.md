@@ -27,7 +27,7 @@ The package uses the Thorlabs APT.dll shared library, and therefore the low-leve
 
 1. Install the script via the package manager pip,
 ```bash
-pip install pyThorlabsAPT==0.11
+pip install pyThorlabsAPT==0.12
 ```
 Important: due to a bug of pypi, if you run just '''pip install pyThorlabsAPT''' it might default to a stale version 0.21, which was wrongly uploaded on pypi in the past and it does not work. Make sure you specify the version.
 

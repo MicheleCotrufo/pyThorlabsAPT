@@ -1,3 +1,4 @@
 include pyThorlabsAPT/graphics/*
 include pyThorlabsAPT/thorlabs_apt/*
 include pyThorlabsAPT/*.json
+include requirements_strict.txt
